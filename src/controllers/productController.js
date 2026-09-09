@@ -19,21 +19,36 @@ const getUserIdFromReq = (req) => {
   return null;
 };
 
-// GET /api/products?name=&category_id=
+// GET /api/products?name=&category_id=&is_popular=&sort=
 const getProducts = async (req, res) => {
   try {
-    const { name, category_id, categoryId } = req.query;
+    const { name, category_id, categoryId, is_popular, popular, sort } = req.query;
     let products = [...db.products];
 
     if (name) {
+      const q = name.toLowerCase().trim();
       products = products.filter((p) =>
-        p.name.toLowerCase().includes(name.toLowerCase())
+        p.name.toLowerCase().includes(q) ||
+        (p.name_ar && p.name_ar.includes(name.trim())) ||
+        (p.description && p.description.toLowerCase().includes(q))
       );
     }
 
     const catId = category_id || categoryId;
-    if (catId) {
+    if (catId && catId !== "0" && catId !== "all") {
       products = products.filter((p) => p.category_id === parseInt(catId));
+    }
+
+    if (is_popular === "true" || popular === "true" || is_popular === "1") {
+      products = products.filter((p) => p.is_popular);
+    }
+
+    if (sort === "price_asc") {
+      products.sort((a, b) => a.price - b.price);
+    } else if (sort === "price_desc") {
+      products.sort((a, b) => b.price - a.price);
+    } else if (sort === "rating") {
+      products.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     }
 
     const userId = getUserIdFromReq(req);
@@ -43,7 +58,7 @@ const getProducts = async (req, res) => {
       ...p,
       category: db.categories.find((c) => c.id === p.category_id) || null,
       is_favorite: userId
-        ? db.favorites.some((f) => f.user_id === userId && f.product_id === p.id)
+        ? db.favorites.some((f) => String(f.user_id) === String(userId) && f.product_id === p.id)
         : false,
     }));
 
@@ -70,7 +85,7 @@ const getProductById = async (req, res) => {
         ...product,
         category: db.categories.find((c) => c.id === product.category_id) || null,
         is_favorite: userId
-          ? db.favorites.some((f) => f.user_id === userId && f.product_id === id)
+          ? db.favorites.some((f) => String(f.user_id) === String(userId) && f.product_id === id)
           : false,
       },
       200

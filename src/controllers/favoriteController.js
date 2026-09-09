@@ -18,7 +18,7 @@ const toggleFavorite = async (req, res) => {
     }
 
     const index = db.favorites.findIndex(
-      (f) => f.user_id === userId && f.product_id === productIdNum
+      (f) => String(f.user_id) === String(userId) && f.product_id === productIdNum
     );
 
     let isFavorite = false;
@@ -46,7 +46,7 @@ const getFavorites = async (req, res) => {
   try {
     const userId = req.user.id;
     const userFavorites = db.favorites
-      .filter((f) => f.user_id === userId)
+      .filter((f) => String(f.user_id) === String(userId))
       .map((f) => {
         const product = db.products.find((p) => p.id === f.product_id);
         return product
