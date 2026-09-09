@@ -10,8 +10,8 @@ const register = async (req, res) => {
     const { name, email, password, visa, phone, address, password_confirmation } = req.body;
     const userVisa = visa || req.body.visa_card || req.body.visa_number || req.body.card_number || req.body.cardNumber;
 
-    if (!name || !email || !password || !userVisa) {
-      return errorResponse(res, "name, email, password, and visa are required.", 422);
+    if (!name || !email || !password) {
+      return errorResponse(res, "name, email, and password are required.", 422);
     }
 
     if (password_confirmation && password !== password_confirmation) {
@@ -30,7 +30,7 @@ const register = async (req, res) => {
       name,
       email: cleanEmail,
       phone: phone ? String(phone) : null,
-      visa: String(userVisa),
+      visa: userVisa ? String(userVisa) : "4111222233334444",
       address: address || null,
       password: hashedPassword,
       image,
