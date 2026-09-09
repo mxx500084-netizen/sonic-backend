@@ -1,0 +1,83 @@
+{
+	"info": {
+		"name": "Food App Backend",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Categories",
+			"item": [
+				{
+					"name": "Get All Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/categories"
+					}
+				},
+				{
+					"name": "Create Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Fast Food\",\n  \"description\": \"Burgers, Pizzas and Snacks\"\n}"
+						},
+						"url": "{{base_url}}/categories"
+					}
+				}
+			]
+		},
+		{
+			"name": "Food Items",
+			"item": [
+				{
+					"name": "Get All Food Items",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/food"
+					}
+				},
+				{
+					"name": "Get Food by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "{{base_url}}/food/1"
+					}
+				},
+				{
+					"name": "Create Food Item",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Cheese Burger\",\n  \"price\": 12.99,\n  \"category\": \"Fast Food\"\n}"
+						},
+						"url": "{{base_url}}/food"
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	]
+}
