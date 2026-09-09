@@ -29,11 +29,10 @@ const register = async (req, res) => {
       id: db.userIdCounter++,
       name,
       email: cleanEmail,
-      phone: phone ? String(phone) : null,
       visa: userVisa ? String(userVisa) : "4111222233334444",
+      image,
       address: address || null,
       password: hashedPassword,
-      image,
       created_at: new Date().toISOString(),
     };
 

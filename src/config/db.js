@@ -4,7 +4,6 @@ const db = {
       id: 1,
       name: "Motaz",
       email: "motaz@example.com",
-      phone: "01559333247",
       visa: "4111222233334444",
       password: "$2b$12$GxsIjXiFfCcEX/gDRzX.KOrgGdNFq9mrJYm9MVq.9OdCjr0Ybo7Qu", // 12345678
       image: null,
