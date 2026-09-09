@@ -65,10 +65,14 @@ const login = async (req, res) => {
 
     const cleanEmail = String(email).toLowerCase().trim();
     const user = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
-    if (!user) return errorResponse(res, "Invalid credentials.", 401);
+    if (!user) {
+      return errorResponse(res, "Email not found.", 401, { email: "Email not found." });
+    }
 
     const valid = await bcrypt.compare(String(password), user.password);
-    if (!valid) return errorResponse(res, "Invalid credentials.", 401);
+    if (!valid) {
+      return errorResponse(res, "Incorrect password.", 401, { password: "Incorrect password." });
+    }
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d",
