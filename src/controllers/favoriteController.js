@@ -1,43 +1,68 @@
 const db = require("../config/db");
-const { success, error } = require("../config/response");
+const { successResponse, errorResponse } = require("../config/response");
 
 // POST /api/toggle-favorite
-const toggleFavorite = (req, res) => {
-  const { product_id } = req.body;
-  const user_id = req.user.id;
+const toggleFavorite = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const product_id = req.body.product_id || req.body.productId;
 
-  if (!product_id) return error(res, "product_id is required.", 422);
+    if (!product_id) {
+      return errorResponse(res, "product_id is required", 400);
+    }
 
-  const product = db.products.find((p) => p.id === parseInt(product_id));
-  if (!product) return error(res, "Product not found.", 404);
+    const productIdNum = parseInt(product_id);
+    const product = db.products.find((p) => p.id === productIdNum);
+    if (!product) {
+      return errorResponse(res, "Product not found", 404);
+    }
 
-  const index = db.favorites.findIndex(
-    (f) => f.user_id === user_id && f.product_id === parseInt(product_id)
-  );
+    const index = db.favorites.findIndex(
+      (f) => f.user_id === userId && f.product_id === productIdNum
+    );
 
-  if (index !== -1) {
-    db.favorites.splice(index, 1);
-    return success(res, { is_favorite: false }, "Removed from favorites.");
-  } else {
-    db.favorites.push({ user_id, product_id: parseInt(product_id) });
-    return success(res, { is_favorite: true }, "Added to favorites.");
+    let isFavorite = false;
+    if (index !== -1) {
+      db.favorites.splice(index, 1);
+      isFavorite = false;
+    } else {
+      db.favorites.push({ user_id: userId, product_id: productIdNum });
+      isFavorite = true;
+    }
+
+    return successResponse(
+      res,
+      isFavorite ? "Added to favorites" : "Removed from favorites",
+      { product_id: productIdNum, is_favorite: isFavorite },
+      200
+    );
+  } catch (error) {
+    return errorResponse(res, error.message || "Failed to toggle favorite.", 500);
   }
 };
 
 // GET /api/favorites
-const getFavorites = (req, res) => {
-  const user_id = req.user.id;
-  const userFavorites = db.favorites
-    .filter((f) => f.user_id === user_id)
-    .map((f) => {
-      const product = db.products.find((p) => p.id === f.product_id);
-      return product
-        ? { ...product, category: db.categories.find((c) => c.id === product.category_id) }
-        : null;
-    })
-    .filter(Boolean);
+const getFavorites = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userFavorites = db.favorites
+      .filter((f) => f.user_id === userId)
+      .map((f) => {
+        const product = db.products.find((p) => p.id === f.product_id);
+        return product
+          ? {
+              ...product,
+              category: db.categories.find((c) => c.id === product.category_id) || null,
+              is_favorite: true,
+            }
+          : null;
+      })
+      .filter(Boolean);
 
-  return success(res, userFavorites, "Favorites retrieved.");
+    return successResponse(res, "Favorites fetched successfully", userFavorites, 200);
+  } catch (error) {
+    return errorResponse(res, error.message || "Failed to fetch favorites.", 500);
+  }
 };
 
 module.exports = { toggleFavorite, getFavorites };

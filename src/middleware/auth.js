@@ -1,32 +1,35 @@
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
-const { error } = require("../config/response");
+const { errorResponse } = require("../config/response");
 
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return error(res, "Unauthorized. Token required.", 401);
+    return errorResponse(res, "Unauthorized. Token required.", 401);
   }
 
   const token = authHeader.split(" ")[1];
 
   if (db.blacklistedTokens.has(token)) {
-    return error(res, "Token has been invalidated. Please login again.", 401);
+    return errorResponse(res, "Token has been invalidated. Please login again.", 401);
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = db.users.find((u) => u.id === decoded.id);
 
-    if (!user) return error(res, "User not found.", 401);
+    if (!user) return errorResponse(res, "User not found.", 401);
 
     req.user = user;
     req.token = token;
     next();
   } catch (err) {
-    return error(res, "Invalid or expired token.", 401);
+    return errorResponse(res, "Invalid or expired token.", 401);
   }
 };
 
-module.exports = { authenticate };
+module.exports = authenticate;
+module.exports.authenticate = authenticate;
+module.exports.auth = authenticate;
+

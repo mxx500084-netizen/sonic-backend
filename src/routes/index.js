@@ -1,49 +1,48 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
 
-const { authenticate } = require("../middleware/auth");
-const upload = require("../middleware/upload");
+const authController = require('../controllers/authController');
+const productController = require('../controllers/productController');
+const categoryController = require('../controllers/categoryController');
+const favoriteController = require('../controllers/favoriteController');
+const optionsController = require('../controllers/optionsController');
+const orderController = require('../controllers/orderController');
+const cartController = require('../controllers/cartController');
 
-const { register, login, logout, getProfile, updateProfile } = require("../controllers/authController");
-const { getAllCategories } = require("../controllers/categoryController");
-const { getProducts, getProductById } = require("../controllers/productController");
-const { toggleFavorite, getFavorites } = require("../controllers/favoriteController");
-const { getToppings, getSideOptions } = require("../controllers/optionsController");
-const { saveOrder, getOrders, getOrderById } = require("../controllers/orderController");
-const { addToCart, getCart, removeFromCart } = require("../controllers/cartController");
+const auth = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
-// ─── Auth ────────────────────────────────────────────────
-router.post("/register", upload.single("image"), register);
-router.post("/login", login);
-router.post("/logout", authenticate, logout);
+// Auth Routes
+router.post('/register', upload.single('image'), authController.register);
+router.post('/login', authController.login);
+router.post('/logout', auth, authController.logout);
+router.get('/profile', auth, authController.getProfile);
+router.post('/update-profile', auth, upload.single('image'), authController.updateProfile);
 
-// ─── Profile ─────────────────────────────────────────────
-router.get("/profile", authenticate, getProfile);
-router.post("/update-profile", authenticate, upload.single("image"), updateProfile);
+// Category Routes
+router.get('/categories', categoryController.getAllCategories);
 
-// ─── Categories ───────────────────────────────────────────
-router.get("/categories", getAllCategories);
+// Product Routes
+router.get('/products', productController.getProducts);
+router.get('/products/:id', productController.getProductById);
 
-// ─── Products ─────────────────────────────────────────────
-router.get("/products", authenticate, getProducts);
-router.get("/products/:id", authenticate, getProductById);
+// Favorite Routes
+router.post('/toggle-favorite', auth, favoriteController.toggleFavorite);
+router.get('/favorites', auth, favoriteController.getFavorites);
 
-// ─── Favorites ────────────────────────────────────────────
-router.post("/toggle-favorite", authenticate, toggleFavorite);
-router.get("/favorites", authenticate, getFavorites);
+// Product Options Routes
+router.get('/toppings', optionsController.getToppings);
+router.get('/side-options', optionsController.getSideOptions);
 
-// ─── Product Options ──────────────────────────────────────
-router.get("/toppings", authenticate, getToppings);
-router.get("/side-options", authenticate, getSideOptions);
+// Order Routes
+router.post('/orders', auth, orderController.saveOrder);
+router.get('/orders', auth, orderController.getOrders);
+router.get('/orders/:id', auth, orderController.getOrderById);
 
-// ─── Orders ───────────────────────────────────────────────
-router.post("/orders", authenticate, saveOrder);
-router.get("/orders", authenticate, getOrders);
-router.get("/orders/:id", authenticate, getOrderById);
-
-// ─── Cart ─────────────────────────────────────────────────
-router.post("/cart/add", authenticate, addToCart);
-router.get("/cart", authenticate, getCart);
-router.delete("/cart/remove/:id", authenticate, removeFromCart);
+// Cart Routes
+router.post('/cart/add', auth, cartController.addToCart);
+router.get('/cart', auth, cartController.getCart);
+router.delete('/cart/remove/:id', auth, cartController.removeFromCart);
 
 module.exports = router;
+

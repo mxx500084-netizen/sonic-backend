@@ -1,47 +1,84 @@
 const db = require("../config/db");
-const { success, error } = require("../config/response");
+const jwt = require("jsonwebtoken");
+const { successResponse, errorResponse } = require("../config/response");
+
+const getUserIdFromReq = (req) => {
+  if (req.user?.id) return req.user.id;
+  const authHeader = req.headers?.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.split(" ")[1];
+      if (!db.blacklistedTokens.has(token)) {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        return decoded?.id;
+      }
+    } catch (e) {
+      // ignore token error on public route
+    }
+  }
+  return null;
+};
 
 // GET /api/products?name=&category_id=
-const getProducts = (req, res) => {
-  const { name, category_id } = req.query;
-  let products = [...db.products];
+const getProducts = async (req, res) => {
+  try {
+    const { name, category_id, categoryId } = req.query;
+    let products = [...db.products];
 
-  if (name) {
-    products = products.filter((p) =>
-      p.name.toLowerCase().includes(name.toLowerCase())
-    );
+    if (name) {
+      products = products.filter((p) =>
+        p.name.toLowerCase().includes(name.toLowerCase())
+      );
+    }
+
+    const catId = category_id || categoryId;
+    if (catId) {
+      products = products.filter((p) => p.category_id === parseInt(catId));
+    }
+
+    const userId = getUserIdFromReq(req);
+
+    // Attach category info and is_favorite
+    const result = products.map((p) => ({
+      ...p,
+      category: db.categories.find((c) => c.id === p.category_id) || null,
+      is_favorite: userId
+        ? db.favorites.some((f) => f.user_id === userId && f.product_id === p.id)
+        : false,
+    }));
+
+    return successResponse(res, "Products fetched successfully", result, 200);
+  } catch (error) {
+    return errorResponse(res, error.message || "Failed to fetch products.", 500);
   }
-
-  if (category_id) {
-    products = products.filter((p) => p.category_id === parseInt(category_id));
-  }
-
-  // Attach category info
-  const result = products.map((p) => ({
-    ...p,
-    category: db.categories.find((c) => c.id === p.category_id) || null,
-    is_favorite: db.favorites.some(
-      (f) => f.user_id === req.user.id && f.product_id === p.id
-    ),
-  }));
-
-  return success(res, result, "Products retrieved.");
 };
 
 // GET /api/products/:id
-const getProductById = (req, res) => {
-  const id = parseInt(req.params.id);
-  const product = db.products.find((p) => p.id === id);
+const getProductById = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const product = db.products.find((p) => p.id === id);
 
-  if (!product) return error(res, "Product not found.", 404);
+    if (!product) return errorResponse(res, "Product not found.", 404);
 
-  return success(res, {
-    ...product,
-    category: db.categories.find((c) => c.id === product.category_id) || null,
-    is_favorite: db.favorites.some(
-      (f) => f.user_id === req.user.id && f.product_id === id
-    ),
-  }, "Product retrieved.");
+    const userId = getUserIdFromReq(req);
+
+    return successResponse(
+      res,
+      "Product fetched successfully",
+      {
+        ...product,
+        category: db.categories.find((c) => c.id === product.category_id) || null,
+        is_favorite: userId
+          ? db.favorites.some((f) => f.user_id === userId && f.product_id === id)
+          : false,
+      },
+      200
+    );
+  } catch (error) {
+    return errorResponse(res, error.message || "Failed to fetch product.", 500);
+  }
 };
 
 module.exports = { getProducts, getProductById };
+

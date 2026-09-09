@@ -1,14 +1,23 @@
 const db = require("../config/db");
-const { success } = require("../config/response");
+const { successResponse, errorResponse } = require("../config/response");
 
 // GET /api/toppings
-const getToppings = (req, res) => {
-  return success(res, db.toppings, "Toppings retrieved.");
+const getToppings = async (req, res) => {
+  try {
+    return successResponse(res, "Toppings fetched successfully", db.toppings, 200);
+  } catch (error) {
+    return errorResponse(res, error.message || "Failed to fetch toppings.", 500);
+  }
 };
 
 // GET /api/side-options
-const getSideOptions = (req, res) => {
-  return success(res, db.sideOptions, "Side options retrieved.");
+const getSideOptions = async (req, res) => {
+  try {
+    return successResponse(res, "Side options fetched successfully", db.sideOptions, 200);
+  } catch (error) {
+    return errorResponse(res, error.message || "Failed to fetch side options.", 500);
+  }
 };
 
 module.exports = { getToppings, getSideOptions };
+

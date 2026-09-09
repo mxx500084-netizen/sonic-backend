@@ -4,7 +4,7 @@ const cors = require("cors");
 const path = require("path");
 
 const routes = require("./routes");
-const { error } = require("./config/response");
+const { errorResponse } = require("./config/response");
 const db = require("./config/db");
 const { saveDb, scheduleSave } = require("./config/persist");
 
@@ -39,13 +39,13 @@ app.use("/api", routes);
 
 // ─── 404 Handler ─────────────────────────────────────────
 app.use((req, res) => {
-  return error(res, `Route ${req.method} ${req.url} not found.`, 404);
+  return errorResponse(res, `Route ${req.method} ${req.url} not found.`, 404);
 });
 
 // ─── Global Error Handler ─────────────────────────────────
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  return error(res, err.message || "Internal server error.", 500);
+  return errorResponse(res, err.message || "Internal server error.", 500);
 });
 
 // ─── Start Server ─────────────────────────────────────────
