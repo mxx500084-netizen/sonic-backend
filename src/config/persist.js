@@ -9,6 +9,7 @@ const PERSISTED_KEYS = [
   "favorites",
   "orders",
   "cartItems",
+  "userIdCounter",
   "orderIdCounter",
   "cartIdCounter",
 ];
@@ -42,6 +43,9 @@ const loadDb = (db) => {
     if (Array.isArray(saved.blacklistedTokens)) {
       db.blacklistedTokens = new Set(saved.blacklistedTokens);
     }
+    if (typeof saved.userIdCounter === "number") {
+      db.userIdCounter = saved.userIdCounter;
+    }
     if (typeof saved.orderIdCounter === "number") {
       db.orderIdCounter = saved.orderIdCounter;
     }
@@ -67,6 +71,7 @@ const saveDb = (db) => {
       orders: db.orders,
       cartItems: db.cartItems,
       blacklistedTokens: Array.from(db.blacklistedTokens),
+      userIdCounter: db.userIdCounter,
       orderIdCounter: db.orderIdCounter,
       cartIdCounter: db.cartIdCounter,
     };

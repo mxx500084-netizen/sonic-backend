@@ -1,16 +1,18 @@
 const db = {
   users: [
     {
-      id: "1",
+      id: 1,
       name: "Motaz",
       email: "motaz@example.com",
       phone: "01559333247",
+      visa: "4111222233334444",
       password: "$2b$12$GxsIjXiFfCcEX/gDRzX.KOrgGdNFq9mrJYm9MVq.9OdCjr0Ybo7Qu", // 12345678
       image: null,
       address: "123 Main St Apartment 4A, New York, NY",
       created_at: new Date().toISOString(),
     },
   ],
+  userIdCounter: 2,
   blacklistedTokens: new Set(),
   categories: [
     { id: 1, name: "Burgers", image: "burgers.png" },

@@ -7,10 +7,15 @@ const { successResponse, errorResponse } = require("../config/response");
 // POST /api/register
 const register = async (req, res) => {
   try {
-    const { name, email, phone, password, address } = req.body;
+    const { name, email, password, visa, phone, address, password_confirmation } = req.body;
+    const userVisa = visa || req.body.visa_card || req.body.visa_number || req.body.card_number || req.body.cardNumber;
 
-    if (!name || !email || !phone || !password) {
-      return errorResponse(res, "name, email, phone, and password are required.", 422);
+    if (!name || !email || !password || !userVisa) {
+      return errorResponse(res, "name, email, password, and visa are required.", 422);
+    }
+
+    if (password_confirmation && password !== password_confirmation) {
+      return errorResponse(res, "Passwords do not match.", 422);
     }
 
     const cleanEmail = email.toLowerCase().trim();
@@ -21,10 +26,11 @@ const register = async (req, res) => {
     const image = req.file ? req.file.filename : null;
 
     const user = {
-      id: uuidv4(),
+      id: db.userIdCounter++,
       name,
       email: cleanEmail,
-      phone,
+      phone: phone ? String(phone) : null,
+      visa: String(userVisa),
       address: address || null,
       password: hashedPassword,
       image,
@@ -94,7 +100,7 @@ const getProfile = async (req, res) => {
 // POST /api/update-profile
 const updateProfile = async (req, res) => {
   try {
-    const { name, email, phone, address } = req.body;
+    const { name, email, phone, address, visa } = req.body;
     const userId = req.user.id;
     const userIndex = db.users.findIndex((u) => u.id === userId);
 
@@ -112,6 +118,7 @@ const updateProfile = async (req, res) => {
     if (email !== undefined) user.email = email;
     if (phone !== undefined) user.phone = phone;
     if (address !== undefined) user.address = address;
+    if (visa !== undefined) user.visa = String(visa);
     if (req.file) user.image = req.file.filename;
 
     db.users[userIndex] = user;
