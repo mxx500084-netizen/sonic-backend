@@ -1,6 +1,16 @@
-// In-memory database (replace with real DB like MySQL/MongoDB in production)
 const db = {
-  users: [],
+  users: [
+    {
+      id: "1",
+      name: "Motaz",
+      email: "motaz@example.com",
+      phone: "01559333247",
+      password: "$2b$12$GxsIjXiFfCcEX/gDRzX.KOrgGdNFq9mrJYm9MVq.9OdCjr0Ybo7Qu", // 12345678
+      image: null,
+      address: "123 Main St Apartment 4A, New York, NY",
+      created_at: new Date().toISOString(),
+    },
+  ],
   blacklistedTokens: new Set(),
   categories: [
     { id: 1, name: "Burgers", image: "burgers.png" },
@@ -27,10 +37,40 @@ const db = {
     { id: 3, name: "Onion Rings", price: 12.00 },
   ],
   favorites: [],   // { user_id, product_id }
-  orders: [],      // { id, user_id, items, total, status, created_at }
-  cartItems: [],   // { id, user_id, product_id, quantity, spicy, toppings, side_options }
-  orderIdCounter: 1,
-  cartIdCounter: 1,
+  orders: [
+    {
+      id: 4,
+      user_id: "1",
+      items: [
+        {
+          product: { id: 1, name: "Classic Burger", description: "Juicy beef patty with fresh veggies", price: 59.99, category_id: 1, image: "burger1.png" },
+          quantity: 2,
+          spicy: 0.1,
+          toppings: [{ id: 1, name: "Extra Cheese", price: 5.00 }, { id: 2, name: "Jalapeños", price: 3.00 }],
+          side_options: [{ id: 1, name: "French Fries", price: 15.00 }],
+          item_total: 165.98,
+        },
+      ],
+      total: 165.98,
+      status: "pending",
+      created_at: new Date().toISOString(),
+    },
+  ],      // { id, user_id, items, total, status, created_at }
+  cartItems: [
+    {
+      id: 24,
+      user_id: "1",
+      product_id: 1,
+      product: { id: 1, name: "Classic Burger", description: "Juicy beef patty with fresh veggies", price: 59.99, category_id: 1, image: "burger1.png" },
+      quantity: 2,
+      spicy: 0.1,
+      toppings: [1, 2, 3],
+      side_options: [1, 2, 3],
+      created_at: new Date().toISOString(),
+    },
+  ],   // { id, user_id, product_id, quantity, spicy, toppings, side_options }
+  orderIdCounter: 5,
+  cartIdCounter: 25,
 };
 
 // Load any previously persisted users/orders/favorites/cart from disk

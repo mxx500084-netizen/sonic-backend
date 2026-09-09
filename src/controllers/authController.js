@@ -13,16 +13,17 @@ const register = async (req, res) => {
       return errorResponse(res, "name, email, phone, and password are required.", 422);
     }
 
-    const existing = db.users.find((u) => u.email === email);
+    const cleanEmail = email.toLowerCase().trim();
+    const existing = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
     if (existing) return errorResponse(res, "Email already registered.", 422);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(String(password), 10);
     const image = req.file ? req.file.filename : null;
 
     const user = {
       id: uuidv4(),
       name,
-      email,
+      email: cleanEmail,
       phone,
       address: address || null,
       password: hashedPassword,
@@ -57,10 +58,11 @@ const login = async (req, res) => {
       return errorResponse(res, "Email and password are required.", 422);
     }
 
-    const user = db.users.find((u) => u.email === email);
+    const cleanEmail = String(email).toLowerCase().trim();
+    const user = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
     if (!user) return errorResponse(res, "Invalid credentials.", 401);
 
-    const valid = await bcrypt.compare(password, user.password);
+    const valid = await bcrypt.compare(String(password), user.password);
     if (!valid) return errorResponse(res, "Invalid credentials.", 401);
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
