@@ -95,5 +95,91 @@ const getProductById = async (req, res) => {
   }
 };
 
-module.exports = { getProducts, getProductById };
+// POST /api/products or /api/food
+const createProduct = async (req, res) => {
+  try {
+    const {
+      name,
+      name_ar,
+      description,
+      price,
+      category,
+      category_id,
+      image,
+      image_url,
+      spicy,
+      calories,
+      prep_time,
+      rating,
+    } = req.body;
+
+    if (!name || price === undefined) {
+      return errorResponse(res, "name and price are required", 400);
+    }
+
+    // Resolve category_id if a category name string was provided (e.g. "Fast Food")
+    let catId = category_id;
+    if (!catId && category) {
+      const found = db.categories.find(
+        (c) =>
+          c.name.toLowerCase() === String(category).toLowerCase() ||
+          c.id === parseInt(category)
+      );
+      if (found) {
+        catId = found.id;
+      } else {
+        // Automatically create the category if it doesn't exist yet!
+        const newCatId =
+          db.categories.length > 0
+            ? Math.max(...db.categories.map((c) => c.id)) + 1
+            : 1;
+        const autoCat = {
+          id: newCatId,
+          name: String(category),
+          name_ar: String(category),
+          image: "default.png",
+          image_url: null,
+        };
+        db.categories.push(autoCat);
+        catId = newCatId;
+      }
+    }
+
+    const newId =
+      db.products.length > 0
+        ? Math.max(...db.products.map((p) => p.id)) + 1
+        : 1;
+
+    const newProduct = {
+      id: newId,
+      name,
+      name_ar: name_ar || name,
+      description: description || "",
+      price: parseFloat(price),
+      category_id: parseInt(catId) || 1,
+      image: image || image_url || "burger1.png",
+      image_url: image_url || image || null,
+      rating: rating ? parseFloat(rating) : 4.8,
+      calories: calories ? parseInt(calories) : 500,
+      prep_time: prep_time || "15-20 min",
+      spicy: spicy !== undefined ? parseFloat(spicy) : 0.0,
+      is_popular: req.body.is_popular === true,
+    };
+
+    db.products.push(newProduct);
+    const categoryObj =
+      db.categories.find((c) => c.id === newProduct.category_id) || null;
+
+    return successResponse(
+      res,
+      "Food item created successfully",
+      { ...newProduct, category: categoryObj },
+      201
+    );
+  } catch (error) {
+    return errorResponse(res, error.message || "Failed to create product.", 500);
+  }
+};
+
+module.exports = { getProducts, getProductById, createProduct };
 

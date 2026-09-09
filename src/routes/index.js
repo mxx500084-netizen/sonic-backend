@@ -25,10 +25,21 @@ router.put('/profile', auth, upload.single('image'), authController.updateProfil
 // Category Routes
 router.get('/categories', categoryController.getAllCategories);
 router.get('/category', categoryController.getAllCategories);
+router.post('/categories', categoryController.createCategory);
+router.post('/category', categoryController.createCategory);
 
 // Product Routes
 router.get('/products', productController.getProducts);
 router.get('/products/:id', productController.getProductById);
+router.post('/products', productController.createProduct);
+
+// Food & Items Routes (aliases for FoodApp collection)
+router.get('/food', productController.getProducts);
+router.get('/food/:id', productController.getProductById);
+router.post('/food', productController.createProduct);
+router.get('/items', productController.getProducts);
+router.get('/items/:id', productController.getProductById);
+router.post('/items', productController.createProduct);
 
 // Favorite Routes
 router.post('/toggle-favorite', auth, favoriteController.toggleFavorite);
