@@ -7,9 +7,13 @@ const routes = require("./routes");
 const { errorResponse } = require("./config/response");
 const db = require("./config/db");
 const { saveDb, scheduleSave } = require("./config/persist");
+const connectDB = require("./config/database");
 
 const app = express();
 const PORT = process.env.PORT || 8000;
+
+// Initialize database connection
+connectDB();
 
 // ─── Middleware ───────────────────────────────────────────
 const allowedOrigins = process.env.CORS_ORIGIN
@@ -19,9 +23,18 @@ app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Ensure DB connection is active for each request (vital for Vercel serverless cold-starts)
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+  } catch (e) {
+    // continue
+  }
+  next();
+});
+
 // ─── Auto-persist mutable data after write requests finish ──
-// (registered before the routes so it always sees the response,
-// regardless of which controller ends up handling the request)
+// (fallback persist so data is also preserved offline)
 app.use((req, res, next) => {
   if (req.method !== "GET") {
     res.on("finish", () => {

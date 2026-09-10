@@ -1,8 +1,11 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { v4: uuidv4 } = require("uuid");
+const mongoose = require("mongoose");
 const db = require("../config/db");
 const { successResponse, errorResponse } = require("../config/response");
+const User = require("../models/User");
+const BlacklistedToken = require("../models/BlacklistedToken");
+const { getNextSequence } = require("../models/Counter");
 
 // POST /api/register
 const register = async (req, res) => {
@@ -18,15 +21,28 @@ const register = async (req, res) => {
       return errorResponse(res, "Passwords do not match.", 422);
     }
 
-    const cleanEmail = email.toLowerCase().trim();
-    const existing = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+    const cleanEmail = String(email).toLowerCase().trim();
+
+    let existing;
+    if (mongoose.connection.readyState === 1) {
+      existing = await User.findOne({ email: cleanEmail });
+    } else {
+      existing = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+    }
     if (existing) return errorResponse(res, "Email already registered.", 422);
+
+    let userId;
+    if (mongoose.connection.readyState === 1) {
+      userId = await getNextSequence("userId");
+    } else {
+      userId = db.userIdCounter++;
+    }
 
     const hashedPassword = await bcrypt.hash(String(password), 10);
     const image = req.file ? req.file.filename : null;
 
-    const user = {
-      id: db.userIdCounter++,
+    const userData = {
+      id: userId,
       name,
       email: cleanEmail,
       visa: userVisa ? String(userVisa) : "4111222233334444",
@@ -36,17 +52,20 @@ const register = async (req, res) => {
       created_at: new Date().toISOString(),
     };
 
-    db.users.push(user);
+    if (mongoose.connection.readyState === 1) {
+      await User.create(userData);
+    }
+    db.users.push(userData);
 
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: userData.id }, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN || "7d",
     });
 
-    const { password: _, ...userData } = user;
+    const { password: _, ...userWithoutPassword } = userData;
     return successResponse(
       res,
       "Registration successful",
-      { token, ...userData, user: userData },
+      { token, ...userWithoutPassword, user: userWithoutPassword },
       201
     );
   } catch (error) {
@@ -64,7 +83,14 @@ const login = async (req, res) => {
     }
 
     const cleanEmail = String(email).toLowerCase().trim();
-    const user = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+    let user;
+    if (mongoose.connection.readyState === 1) {
+      user = await User.findOne({ email: cleanEmail }).lean();
+    } else {
+      user = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
+    }
+
     if (!user) {
       return errorResponse(res, "Email not found.", 401, { email: "Email not found." });
     }
@@ -103,30 +129,49 @@ const getProfile = async (req, res) => {
 // POST /api/update-profile
 const updateProfile = async (req, res) => {
   try {
-    const { name, email, phone, address, visa } = req.body;
-    const userId = req.user.id;
-    const userIndex = db.users.findIndex((u) => u.id === userId);
+    const { name, email, address, visa } = req.body;
+    const userVisa = visa || req.body.visa_card || req.body.visa_number || req.body.card_number;
 
-    if (userIndex === -1) {
-      return errorResponse(res, "User not found.", 404);
+    let user;
+    if (mongoose.connection.readyState === 1) {
+      user = await User.findOne({ id: req.user.id });
+    } else {
+      user = db.users.find((u) => u.id === req.user.id);
     }
+    if (!user) return errorResponse(res, "User not found.", 404);
 
-    if (email && email !== req.user.email) {
-      const emailTaken = db.users.find((u) => u.email === email && u.id !== userId);
+    if (email) {
+      const cleanEmail = email.toLowerCase().trim();
+      let emailTaken;
+      if (mongoose.connection.readyState === 1) {
+        emailTaken = await User.findOne({ email: cleanEmail, id: { $ne: user.id } });
+      } else {
+        emailTaken = db.users.find((u) => u.email.toLowerCase() === cleanEmail && u.id !== user.id);
+      }
       if (emailTaken) return errorResponse(res, "Email already in use.", 422);
+      user.email = cleanEmail;
     }
 
-    const user = db.users[userIndex];
-    if (name !== undefined) user.name = name;
-    if (email !== undefined) user.email = email;
-    if (phone !== undefined) user.phone = phone;
-    if (address !== undefined) user.address = address;
-    if (visa !== undefined) user.visa = String(visa);
+    if (name) user.name = name;
+    if (address) user.address = address;
+    if (userVisa) user.visa = String(userVisa);
     if (req.file) user.image = req.file.filename;
 
-    db.users[userIndex] = user;
+    if (mongoose.connection.readyState === 1 && typeof user.save === "function") {
+      await user.save();
+    }
 
-    const { password: _, ...userData } = user;
+    // Keep memory store in sync
+    const memUser = db.users.find((u) => u.id === req.user.id);
+    if (memUser) {
+      if (name) memUser.name = name;
+      if (email) memUser.email = user.email;
+      if (address) memUser.address = address;
+      if (userVisa) memUser.visa = String(userVisa);
+      if (req.file) memUser.image = req.file.filename;
+    }
+
+    const { password: _, ...userData } = user.toObject ? user.toObject() : user;
     return successResponse(res, "Profile updated successfully", userData, 200);
   } catch (error) {
     return errorResponse(res, error.message || "Update failed.", 500);
@@ -138,6 +183,9 @@ const logout = async (req, res) => {
   try {
     if (req.token) {
       db.blacklistedTokens.add(req.token);
+      if (mongoose.connection.readyState === 1) {
+        await BlacklistedToken.create({ token: req.token }).catch(() => {});
+      }
     }
     return successResponse(res, "Logged out successfully", null, 200);
   } catch (error) {
@@ -148,8 +196,7 @@ const logout = async (req, res) => {
 module.exports = {
   register,
   login,
-  logout,
   getProfile,
   updateProfile,
+  logout,
 };
-

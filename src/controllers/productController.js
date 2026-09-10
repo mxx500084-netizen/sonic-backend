@@ -1,6 +1,11 @@
+const mongoose = require("mongoose");
 const db = require("../config/db");
 const jwt = require("jsonwebtoken");
 const { successResponse, errorResponse } = require("../config/response");
+const Product = require("../models/Product");
+const Category = require("../models/Category");
+const Favorite = require("../models/Favorite");
+const { getNextSequence } = require("../models/Counter");
 
 const getUserIdFromReq = (req) => {
   if (req.user?.id) return req.user.id;
@@ -23,18 +28,65 @@ const getUserIdFromReq = (req) => {
 const getProducts = async (req, res) => {
   try {
     const { name, category_id, categoryId, is_popular, popular, sort } = req.query;
+    const userId = getUserIdFromReq(req);
+    const catId = category_id || categoryId;
+
+    if (mongoose.connection.readyState === 1) {
+      const query = {};
+
+      if (name) {
+        const q = name.trim();
+        query.$or = [
+          { name: { $regex: q, $options: "i" } },
+          { name_ar: { $regex: q, $options: "i" } },
+          { description: { $regex: q, $options: "i" } },
+        ];
+      }
+
+      if (catId && catId !== "0" && catId !== "all") {
+        query.category_id = parseInt(catId);
+      }
+
+      if (is_popular === "true" || popular === "true" || is_popular === "1") {
+        query.is_popular = true;
+      }
+
+      let sortOptions = {};
+      if (sort === "price_asc") sortOptions.price = 1;
+      else if (sort === "price_desc") sortOptions.price = -1;
+      else if (sort === "rating") sortOptions.rating = -1;
+
+      const [products, categories, favorites] = await Promise.all([
+        Product.find(query).sort(sortOptions).lean(),
+        Category.find().lean(),
+        userId ? Favorite.find({ user_id: userId }).lean() : Promise.resolve([]),
+      ]);
+
+      const result = products.map((p) => {
+        const { _id, __v, ...item } = p;
+        return {
+          ...item,
+          category: categories.find((c) => c.id === item.category_id) || null,
+          is_favorite: favorites.some((f) => f.product_id === item.id),
+        };
+      });
+
+      return successResponse(res, "Products fetched successfully", result, 200);
+    }
+
+    // Fallback to in-memory store
     let products = [...db.products];
 
     if (name) {
       const q = name.toLowerCase().trim();
-      products = products.filter((p) =>
-        p.name.toLowerCase().includes(q) ||
-        (p.name_ar && p.name_ar.includes(name.trim())) ||
-        (p.description && p.description.toLowerCase().includes(q))
+      products = products.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.name_ar && p.name_ar.includes(name.trim())) ||
+          (p.description && p.description.toLowerCase().includes(q))
       );
     }
 
-    const catId = category_id || categoryId;
     if (catId && catId !== "0" && catId !== "all") {
       products = products.filter((p) => p.category_id === parseInt(catId));
     }
@@ -51,9 +103,6 @@ const getProducts = async (req, res) => {
       products.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     }
 
-    const userId = getUserIdFromReq(req);
-
-    // Attach category info and is_favorite
     const result = products.map((p) => ({
       ...p,
       category: db.categories.find((c) => c.id === p.category_id) || null,
@@ -72,11 +121,32 @@ const getProducts = async (req, res) => {
 const getProductById = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const product = db.products.find((p) => p.id === id);
-
-    if (!product) return errorResponse(res, "Product not found.", 404);
-
     const userId = getUserIdFromReq(req);
+
+    if (mongoose.connection.readyState === 1) {
+      const [product, categories, favorites] = await Promise.all([
+        Product.findOne({ id }).lean(),
+        Category.find().lean(),
+        userId ? Favorite.find({ user_id: userId }).lean() : Promise.resolve([]),
+      ]);
+
+      if (!product) return errorResponse(res, "Product not found.", 404);
+
+      const { _id, __v, ...item } = product;
+      return successResponse(
+        res,
+        "Product fetched successfully",
+        {
+          ...item,
+          category: categories.find((c) => c.id === item.category_id) || null,
+          is_favorite: favorites.some((f) => f.product_id === item.id),
+        },
+        200
+      );
+    }
+
+    const product = db.products.find((p) => p.id === id);
+    if (!product) return errorResponse(res, "Product not found.", 404);
 
     return successResponse(
       res,
@@ -117,38 +187,55 @@ const createProduct = async (req, res) => {
       return errorResponse(res, "name and price are required", 400);
     }
 
-    // Resolve category_id if a category name string was provided (e.g. "Fast Food")
     let catId = category_id;
     if (!catId && category) {
-      const found = db.categories.find(
-        (c) =>
-          c.name.toLowerCase() === String(category).toLowerCase() ||
-          c.id === parseInt(category)
-      );
-      if (found) {
-        catId = found.id;
+      let foundCategory;
+      if (mongoose.connection.readyState === 1) {
+        foundCategory = await Category.findOne({
+          $or: [
+            { name: { $regex: `^${category}$`, $options: "i" } },
+            { id: parseInt(category) || -1 },
+          ],
+        }).lean();
       } else {
-        // Automatically create the category if it doesn't exist yet!
-        const newCatId =
-          db.categories.length > 0
-            ? Math.max(...db.categories.map((c) => c.id)) + 1
-            : 1;
-        const autoCat = {
-          id: newCatId,
-          name: String(category),
-          name_ar: String(category),
-          image: "default.png",
-          image_url: null,
-        };
-        db.categories.push(autoCat);
+        foundCategory = db.categories.find(
+          (c) =>
+            c.name.toLowerCase() === String(category).toLowerCase() ||
+            c.id === parseInt(category)
+        );
+      }
+
+      if (foundCategory) {
+        catId = foundCategory.id;
+      } else {
+        let newCatId;
+        if (mongoose.connection.readyState === 1) {
+          newCatId = await getNextSequence("categoryId");
+          await Category.create({
+            id: newCatId,
+            name: String(category),
+            name_ar: String(category),
+            image: "default.png",
+          });
+        } else {
+          newCatId = db.categories.length > 0 ? Math.max(...db.categories.map((c) => c.id)) + 1 : 1;
+          db.categories.push({
+            id: newCatId,
+            name: String(category),
+            name_ar: String(category),
+            image: "default.png",
+          });
+        }
         catId = newCatId;
       }
     }
 
-    const newId =
-      db.products.length > 0
-        ? Math.max(...db.products.map((p) => p.id)) + 1
-        : 1;
+    let newId;
+    if (mongoose.connection.readyState === 1) {
+      newId = await getNextSequence("productId");
+    } else {
+      newId = db.products.length > 0 ? Math.max(...db.products.map((p) => p.id)) + 1 : 1;
+    }
 
     const newProduct = {
       id: newId,
@@ -166,9 +253,17 @@ const createProduct = async (req, res) => {
       is_popular: req.body.is_popular === true,
     };
 
+    if (mongoose.connection.readyState === 1) {
+      await Product.create(newProduct);
+    }
     db.products.push(newProduct);
-    const categoryObj =
-      db.categories.find((c) => c.id === newProduct.category_id) || null;
+
+    let categoryObj;
+    if (mongoose.connection.readyState === 1) {
+      categoryObj = await Category.findOne({ id: newProduct.category_id }).lean();
+    } else {
+      categoryObj = db.categories.find((c) => c.id === newProduct.category_id) || null;
+    }
 
     return successResponse(
       res,
@@ -182,4 +277,3 @@ const createProduct = async (req, res) => {
 };
 
 module.exports = { getProducts, getProductById, createProduct };
-
