@@ -16,7 +16,7 @@ const connectDB = async () => {
     process.env.MONGO_URI ||
     process.env.MONGODB_URI ||
     process.env.DATABASE_URL ||
-    "mongodb://127.0.0.1:27017/sonic_food_app";
+    "mongodb://127.0.0.1:27017/sonic_backend";
 
   if (!cached.promise) {
     const opts = {
